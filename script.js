@@ -1,277 +1,281 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // ==================== ELEMENTS ====================
+  const envelopeOverlay = document.getElementById('envelope-overlay');
+  const envelope = document.querySelector('.envelope');
+  const openBtn = document.getElementById('open-invitation');
+  const mainContent = document.getElementById('main-content');
+  const musicBtn = document.getElementById('music-btn');
+  const bgMusic = document.getElementById('bg-music');
+  const themeToggle = document.getElementById('theme-toggle');
+  const guestNameEl = document.getElementById('guest-name');
+  const calendarBtn = document.getElementById('calendar-btn');
+  const calendarDropdown = document.getElementById('calendar-dropdown');
+  const copyAddressBtn = document.getElementById('copy-address');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightbox-img');
+  const galleryItems = document.querySelectorAll('.gallery-item');
+  const petalsContainer = document.getElementById('petals-container');
 
-    /* ==========================================================================
-       1. PERSONALISASI NAMA TAMU (URL Parameter ?to=Nama)
-       ========================================================================== */
-    const urlParams = new URLSearchParams(window.location.search);
-    const guestParam = urlParams.get('to');
-    const guestNameEl = document.getElementById('guest-name');
+  let currentImageIndex = 0;
+  let isMusicPlaying = false;
+  const images = Array.from(galleryItems).map(item => item.querySelector('img').src);
+
+  // ==================== PERSONALISasi NAMA ====================
+  const urlParams = new URLSearchParams(window.location.search);
+  const guestName = urlParams.get('to');
+  if (guestName) {
+    guestNameEl.textContent = `Kepada Yth. ${decodeURIComponent(guestName.replace(/\+/g, ' '))}`;
+  }
+
+  // ==================== THEME ====================
+  const savedTheme = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  } else if (!prefersDark) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+
+  updateThemeIcon();
+
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next === 'dark' ? null : 'light');
+    if (next === 'dark') {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+    updateThemeIcon();
+  });
+
+  function updateThemeIcon() {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    document.querySelector('.icon-sun').classList.toggle('hidden', isLight);
+    document.querySelector('.icon-moon').classList.toggle('hidden', !isLight);
+  }
+
+  // ==================== OPEN ENVELOPE ====================
+  openBtn.addEventListener('click', () => {
+    envelope.classList.add('opened');
     
-    if (guestParam && guestNameEl) {
-        guestNameEl.textContent = guestParam.replace(/\+/g, ' ');
+    setTimeout(() => {
+      envelopeOverlay.classList.add('opened');
+      mainContent.classList.remove('hidden');
+      mainContent.classList.add('visible');
+      
+      // Start music
+      bgMusic.play().then(() => {
+        isMusicPlaying = true;
+        updateMusicIcon();
+      }).catch(() => {});
+
+      // Start petals
+      createPetals();
+      
+      // Trigger hero animation
+      document.querySelector('.hero').classList.add('visible');
+    }, 900);
+  });
+
+  // ==================== MUSIC ====================
+  musicBtn.addEventListener('click', () => {
+    if (isMusicPlaying) {
+      bgMusic.pause();
+      isMusicPlaying = false;
+    } else {
+      bgMusic.play();
+      isMusicPlaying = true;
+    }
+    updateMusicIcon();
+  });
+
+  function updateMusicIcon() {
+    document.querySelector('.icon-play').classList.toggle('hidden', isMusicPlaying);
+    document.querySelector('.icon-pause').classList.toggle('hidden', !isMusicPlaying);
+  }
+
+  // ==================== COUNTDOWN ====================
+  const targetDate = new Date('2026-12-21T10:00:00+07:00').getTime();
+
+  function updateCountdown() {
+    const now = new Date().getTime();
+    const distance = targetDate - now;
+
+    if (distance < 0) {
+      document.getElementById('days').textContent = '00';
+      document.getElementById('hours').textContent = '00';
+      document.getElementById('minutes').textContent = '00';
+      document.getElementById('seconds').textContent = '00';
+      return;
     }
 
-    /* ==========================================================================
-       2. BUKA UNDANGAN & AUTOPLAY AUDIO
-       ========================================================================== */
-    const openingOverlay = document.getElementById('opening-overlay');
-    const mainContent = document.getElementById('main-content');
-    const btnOpen = document.getElementById('btn-open-invitation');
-    const bgMusic = document.getElementById('bg-music');
-    const btnMusic = document.getElementById('btn-music');
+    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-    btnOpen.addEventListener('click', () => {
-        openingOverlay.classList.add('fade-out');
-        mainContent.classList.remove('hidden');
+    document.getElementById('days').textContent = String(days).padStart(2, '0');
+    document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+    document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+    document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+  }
 
-        // Play audio native HTML5
-        if (bgMusic) {
-            bgMusic.play().then(() => {
-                btnMusic.classList.remove('paused');
-                btnMusic.classList.add('playing');
-            }).catch(err => console.log('Autoplay prevented:', err));
-        }
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+
+  // ==================== COPY TO CLIPBOARD ====================
+  document.querySelectorAll('.btn-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.getAttribute('data-rek');
+      try {
+        await navigator.clipboard.writeText(text);
+        const original = btn.textContent;
+        btn.textContent = 'Tersalin!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        alert('Gagal menyalin');
+      }
     });
+  });
 
-    btnMusic.addEventListener('click', () => {
-        if (bgMusic.paused) {
-            bgMusic.play();
-            btnMusic.classList.remove('paused');
-            btnMusic.classList.add('playing');
-        } else {
-            bgMusic.pause();
-            btnMusic.classList.add('paused');
-            btnMusic.classList.remove('playing');
-        }
+  if (copyAddressBtn) {
+    copyAddressBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText('Jl. Contoh No. 123, Yogyakarta');
+        const original = copyAddressBtn.innerHTML;
+        copyAddressBtn.innerHTML = '✓ Tersalin';
+        setTimeout(() => {
+          copyAddressBtn.innerHTML = original;
+        }, 2000);
+      } catch (err) {}
     });
+  }
 
-    /* ==========================================================================
-       3. DARK / LIGHT MODE SWITCH & PERSISTENT STATE
-       ========================================================================== */
-    const themeToggleBtn = document.getElementById('theme-toggle');
-    const htmlEl = document.documentElement;
+  // ==================== CALENDAR ====================
+  calendarBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    calendarDropdown.classList.toggle('hidden');
+  });
 
-    const savedTheme = localStorage.getItem('invitation-theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.addEventListener('click', () => {
+    calendarDropdown.classList.add('hidden');
+  });
 
-    const currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
-    setTheme(currentTheme);
+  // Google Calendar
+  const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Pernikahan%20Arga%20%26%20Larasati&dates=20261221T030000Z/20261221T070000Z&details=Akad%20%26%20Resepsi%20Pernikahan&location=Yogyakarta`;
+  document.getElementById('google-calendar').href = googleCalUrl;
 
-    themeToggleBtn.addEventListener('click', () => {
-        const activeTheme = htmlEl.getAttribute('data-theme');
-        const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-        setTheme(newTheme);
-    });
-
-    function setTheme(theme) {
-        htmlEl.setAttribute('data-theme', theme);
-        localStorage.setItem('invitation-theme', theme);
-        themeToggleBtn.innerHTML = theme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
-    }
-
-    /* ==========================================================================
-       4. COUNTDOWN TIMER REAL-TIME
-       ========================================================================== */
-    const eventDate = new Date('2026-12-20T08:00:00+07:00').getTime();
-
-    const timerDays = document.getElementById('timer-days');
-    const timerHours = document.getElementById('timer-hours');
-    const timerMinutes = document.getElementById('timer-minutes');
-    const timerSeconds = document.getElementById('timer-seconds');
-
-    function updateCountdown() {
-        const now = new Date().getTime();
-        const distance = eventDate - now;
-
-        if (distance < 0) {
-            timerDays.textContent = '00';
-            timerHours.textContent = '00';
-            timerMinutes.textContent = '00';
-            timerSeconds.textContent = '00';
-            return;
-        }
-
-        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-        timerDays.textContent = days < 10 ? '0' + days : days;
-        timerHours.textContent = hours < 10 ? '0' + hours : hours;
-        timerMinutes.textContent = minutes < 10 ? '0' + minutes : minutes;
-        timerSeconds.textContent = seconds < 10 ? '0' + seconds : seconds;
-    }
-
-    setInterval(updateCountdown, 1000);
-    updateCountdown();
-
-    /* ==========================================================================
-       5. FLOATING PETALS GENERATOR
-       ========================================================================== */
-    const petalsContainer = document.getElementById('petals-container');
-    const petalCount = 15;
-
-    for (let i = 0; i < petalCount; i++) {
-        const petal = document.createElement('div');
-        petal.classList.add('petal');
-        
-        const size = Math.random() * 12 + 8; // 8px - 20px
-        petal.style.width = `${size}px`;
-        petal.style.height = `${size}px`;
-        petal.style.left = `${Math.random() * 100}%`;
-        petal.style.animationDuration = `${Math.random() * 8 + 6}s`; // 6s - 14s
-        petal.style.animationDelay = `${Math.random() * 5}s`;
-        
-        petalsContainer.appendChild(petal);
-    }
-
-    /* ==========================================================================
-       6. SCROLL-TRIGGERED REVEAL ANIMATION (Intersection Observer)
-       ========================================================================== */
-    const reveals = document.querySelectorAll('.reveal');
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('active');
-            }
-        });
-    }, { threshold: 0.15 });
-
-    reveals.forEach(el => observer.observe(el));
-
-    /* ==========================================================================
-       7. KALENDER INTEGRATION (.ics & Google Calendar)
-       ========================================================================== */
-    const btnCalendarDropdown = document.getElementById('btn-calendar-dropdown');
-    const calendarMenu = document.getElementById('calendar-menu');
-    const linkGcal = document.getElementById('link-gcal');
-    const linkIcs = document.getElementById('link-ics');
-
-    btnCalendarDropdown.addEventListener('click', (e) => {
-        e.stopPropagation();
-        calendarMenu.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', () => {
-        calendarMenu.classList.add('hidden');
-    });
-
-    // Google Calendar Link
-    const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=The+Wedding+of+Romeo+%26+Juliet&dates=20261220T010000Z/20261220T070000Z&details=Pernikahan+Romeo+%26+Juliet.+Kami+menunggu+kehadiran+Anda!&location=Grand+Ballroom+Hotel+Mulia,+Jakarta`;
-    linkGcal.href = gCalUrl;
-
-    // Download .ics File
-    linkIcs.addEventListener('click', (e) => {
-        e.preventDefault();
-        const icsData = 
-`BEGIN:VCALENDAR
+  // ICS Download
+  document.getElementById('download-ics').addEventListener('click', (e) => {
+    e.preventDefault();
+    const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Romeo Juliet Wedding//ID
 BEGIN:VEVENT
-SUMMARY:The Wedding of Romeo & Juliet
-DESCRIPTION:Pernikahan Romeo & Juliet. Kami menunggu kehadiran Anda!
-LOCATION:Grand Ballroom Hotel Mulia, Jakarta
-DTSTART:20261220T080000
-DTEND:20261220T140000
+DTSTART:20261221T030000Z
+DTEND:20261221T070000Z
+SUMMARY:Pernikahan Arga & Larasati
+DESCRIPTION:Akad & Resepsi Pernikahan
+LOCATION:Yogyakarta
 BEGIN:VALARM
 TRIGGER:-PT1H
 ACTION:DISPLAY
-DESCRIPTION:Reminder: 1 jam sebelum pernikahan Romeo & Juliet
+DESCRIPTION:Reminder
 END:VALARM
 END:VEVENT
 END:VCALENDAR`;
-
-        const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
-        const link = document.createElement('a');
-        link.href = window.URL.createObjectURL(blob);
-        link.setAttribute('download', 'romeo-juliet-wedding.ics');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    });
-
-    /* ==========================================================================
-       8. LIGHTBOX GALLERY FULLSCREEN
-       ========================================================================== */
-    const galleryItems = document.querySelectorAll('.gallery-item img');
-    const lightbox = document.getElementById('lightbox');
-    const lightboxImg = document.getElementById('lightbox-img');
-    const lightboxClose = document.getElementById('lightbox-close');
-    const lightboxPrev = document.getElementById('lightbox-prev');
-    const lightboxNext = document.getElementById('lightbox-next');
     
-    let currentIndex = 0;
+    const blob = new Blob([icsContent], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pernikahan-arga-larasati.ics';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 
-    galleryItems.forEach((img, index) => {
-        img.addEventListener('click', () => {
-            currentIndex = index;
-            showLightboxImage();
-            lightbox.classList.remove('hidden');
-        });
+  // ==================== GALLERY & LIGHTBOX ====================
+  galleryItems.forEach((item, index) => {
+    item.addEventListener('click', () => {
+      currentImageIndex = index;
+      openLightbox();
     });
+  });
 
-    function showLightboxImage() {
-        lightboxImg.src = galleryItems[currentIndex].src;
+  function openLightbox() {
+    lightboxImg.src = images[currentImageIndex];
+    lightbox.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLightbox() {
+    lightbox.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  document.querySelector('.lightbox-close').addEventListener('click', closeLightbox);
+  document.querySelector('.lightbox-prev').addEventListener('click', () => {
+    currentImageIndex = (currentImageIndex - 1 + images.length) % images.length;
+    lightboxImg.src = images[currentImageIndex];
+  });
+  document.querySelector('.lightbox-next').addEventListener('click', () => {
+    currentImageIndex = (currentImageIndex + 1) % images.length;
+    lightboxImg.src = images[currentImageIndex];
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (lightbox.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') {
+      currentImageIndex = (currentImageIndex - 1 + images.length) % images.length;
+      lightboxImg.src = images[currentImageIndex];
     }
-
-    lightboxClose.addEventListener('click', () => lightbox.classList.add('hidden'));
-    lightboxPrev.addEventListener('click', () => {
-        currentIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
-        showLightboxImage();
-    });
-    lightboxNext.addEventListener('click', () => {
-        currentIndex = (currentIndex + 1) % galleryItems.length;
-        showLightboxImage();
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (!lightbox.classList.contains('hidden')) {
-            if (e.key === 'Escape') lightbox.classList.add('hidden');
-            if (e.key === 'ArrowLeft') lightboxPrev.click();
-            if (e.key === 'ArrowRight') lightboxNext.click();
-        }
-    });
-
-    /* ==========================================================================
-       9. COPY TO CLIPBOARD & TOAST NOTIFICATION
-       ========================================================================== */
-    const toast = document.getElementById('toast');
-
-    function showToast(message) {
-        toast.textContent = message;
-        toast.classList.remove('hidden');
-        setTimeout(() => toast.classList.add('hidden'), 2500);
+    if (e.key === 'ArrowRight') {
+      currentImageIndex = (currentImageIndex + 1) % images.length;
+      lightboxImg.src = images[currentImageIndex];
     }
+  });
 
-    document.querySelectorAll('.btn-copy').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetId = btn.getAttribute('data-target');
-            let textToCopy = '';
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox) closeLightbox();
+  });
 
-            if (targetId === 'physical-gift-address') {
-                textToCopy = 'Jl. Kebon Jeruk No. 12, Kebayoran Baru, Jakarta Selatan (UP: Romeo & Juliet - 08123456789)';
-            } else {
-                const targetEl = document.getElementById(targetId);
-                textToCopy = targetEl ? targetEl.textContent.trim() : '';
-            }
-
-            if (textToCopy) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    showToast('Teks berhasil disalin!');
-                }).catch(() => {
-                    showToast('Gagal menyalin teks');
-                });
-            }
-        });
+  // ==================== SCROLL REVEAL ====================
+  const revealElements = document.querySelectorAll('.reveal');
+  
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      }
     });
+  }, { threshold: 0.15 });
 
-    const btnCopyAddress = document.getElementById('btn-copy-address');
-    if (btnCopyAddress) {
-        btnCopyAddress.addEventListener('click', () => {
-            const address = btnCopyAddress.getAttribute('data-address');
-            navigator.clipboard.writeText(address).then(() => {
-                showToast('Alamat berhasil disalin!');
-            });
-        });
-    }
+  revealElements.forEach(el => observer.observe(el));
+
+  // ==================== FLOATING PETALS ====================
+  function createPetals() {
+    setInterval(() => {
+      if (document.hidden) return;
+      
+      const petal = document.createElement('div');
+      petal.classList.add('petal');
+      petal.style.left = Math.random() * 100 + 'vw';
+      petal.style.animationDuration = (Math.random() * 4 + 6) + 's';
+      petal.style.width = petal.style.height = (Math.random() * 8 + 8) + 'px';
+      petal.style.opacity = Math.random() * 0.3 + 0.15;
+      
+      petalsContainer.appendChild(petal);
+      
+      setTimeout(() => petal.remove(), 10000);
+    }, 400);
+  }
 });
